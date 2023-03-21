@@ -265,25 +265,26 @@ if(!file.exists(DestFile) | file.info(DestFile)$size < 1000){  ## if the NIC MIZ
 if(file.exists(DestFile) & file.info(DestFile)$size > 1000){  	## test for it's existence again
 	gotNIC_MIZ <- TRUE 													## Flag the success of acquiring the MIZ data
 	cat('... reading in the', format(Today, 'nic_miz%Y%jnc_pl_a'), 'shape file using rgdal::st_read', fill = T)
-	MIZ <- st_read(dsn=DestFile.loc, 
-	                      layer=format(Today, 'nic_miz%Y%jnc_pl_a'))
-	MIZ@data <- subset(MIZ@data, select='ICECODE')                 		## Retain the ICECODE field
-	if (is.null(proj4string(MIZ))) proj4string(MIZ) <- prj.geo     		## Assign the coordinate system to geographic, if it is not already assigned
-	# MIZ_p.lines<-spTransform(as(MIZ[MIZ@data$ICECODE=='CT81',], 'SpatialLines'), prj.StudyArea)  
-	# MIZ_m.lines<-spTransform(as(MIZ[MIZ@data$ICECODE=='CT18',], 'SpatialLines'), prj.StudyArea)
-	MIZ_p.lines <- st_transform(as(MIZ[MIZ@data$ICECODE=='CT81',],
-	                               'SpatialLines'), prj.StudyArea)  
-	MIZ_m.lines <- st_transform(as(MIZ[MIZ@data$ICECODE=='CT18',],
-	                               'SpatialLines'), prj.StudyArea)
+	
+	MIZ_d <- st_read(dsn=DestFile.loc, layer=format(Today, 'nic_miz%Y%jnc_pl_a'))
+	#MIZ.data <- MIZ_d %>% select(ICECODE)
+	if (is.null(st_crs(MIZ_d))) MIZ_d %>% st_crs(prj.geo)     		## Assign the coordinate system to geographic, if it is not already assigned
+	MIZ_p.lines <- MIZ_d[MIZ_d$ICECODE=='CT81',] %>% st_transform(prj.StudyArea)
+	MIZ_m.lines <- MIZ_d[MIZ_d$ICECODE=='CT18',] %>% st_transform(prj.StudyArea)
+	
+	landAll.buffer<-st_buffer(land_ptolemy, 4000)
+	
+	#MIZ<-rgdal::readOGR(dsn=DestFile.loc, layer=format(Today, 'nic_miz%Y%jnc_pl_a'))
+	#MIZ@data <- subset(MIZ@data, select='ICECODE')                 		## Retain the ICECODE field
+	#if (is.null(proj4string(MIZ))) proj4string(MIZ)<-prj.geo 
+	#MIZ_p.lines<-spTransform(as(MIZ[MIZ@data$ICECODE=='CT81',], 'SpatialLines'), prj.StudyArea)  
+	#MIZ_m.lines<-spTransform(as(MIZ[MIZ@data$ICECODE=='CT18',], 'SpatialLines'), prj.StudyArea)
+
 	# landAll.buffer<-rgeos::gBuffer(landAll.StudyArea, width=4000)
-	landAll.buffer<-rgeos::st_buffer(landAll.StudyArea, width=4000)
 	# MIZ_p.l.clip<-rgeos::gDifference(MIZ_p.lines, landAll.buffer, byid=TRUE) ## Clip with land buffer
 	# MIZ_m.l.clip<-rgeos::gDifference(rgeos::gDifference(MIZ_m.lines, landAll.buffer, byid=TRUE), MIZ_p.l.clip)  ## Clip with land buffer
-	MIZ_p.l.clip<-rgeos::st_difference(MIZ_p.lines, landAll.buffer, byid=TRUE) ## Clip with land buffer
-	MIZ_m.l.clip<-rgeos::st_difference(rgeos::st_difference(MIZ_m.lines, 
-	                                                        landAll.buffer, 
-	                                                        byid=TRUE), 
-	                                   MIZ_p.l.clip)  ## Clip with land buffer
+	MIZ_p.l.clip <- st_difference(MIZ_p.lines, landAll.buffer, byid=TRUE) ## Clip with land buffer
+	MIZ_m.l.clip <- st_difference(st_difference(MIZ_m.lines, landAll.buffer, byid=TRUE), MIZ_p.l.clip)  ## Clip with land buffer
 	## Clip the antimeridian
 	geo180.sp<-data.frame(id=rep(180, 200), x=rep(180, 200), 
 	                      y=seq(from=40, to=89, length.out=200))
