@@ -3,8 +3,6 @@
 ## USGS Alaska Science Center
 ## version: 0.1.1
 ##
-## Issues: Replace rgdal::readOGR('D:/Walrus/BaseMaps/CoastBest.shp', layer="CoastBest") with high resolution coastline of the study area.
-##
 ## License: This code is dedicated to the public domain and all rights are waived to the work worldwide under copyright law, 
 ## including all related and neighboring rights, to the extent allowed by law.
 ## You can copy, modify, distribute and perform the work, even for commercial purposes, all without asking permission. 
@@ -13,8 +11,6 @@ StartTime<-Sys.time()  # put in for diagnostics
 cat('Run at', format(StartTime, '%Y%B%d %H:%M'), fill=T)
 ## Software Dependencies: 
 ## R version 3.3.3 (2017-03-06) or higher, Copyright (C) 2016 The R Foundation for Statistical Computing.
-##
-##
 ## Contributed pacakge Dependencies ########################################################################################################
 
 #require(sp)      ## Required for spatial classes  --> 
@@ -71,7 +67,6 @@ if(!Testing){  ## If we are testing send to a the list of testing recipients, el
                           header = TRUE, stringsAsFactors = F)
 }
 ##																
-# land <- rgdal::readOGR('D:/Walrus/BaseMaps/CoastBest.shp', layer="CoastBest")
 xLimits <- sort(c(150, -130))## define the study area polygon using geographic coordinates (eastings WGS84)
 yLimits <- sort(c(49, 78))
 pts <- expand.grid(xLimits, yLimits) %>% as_tibble()
@@ -87,15 +82,15 @@ pts_bbox <- pts %>%
   st_transform(crs = prj.StudyArea) %>%
   st_union() %>%
   st_convex_hull()
-#
+
 land_ptolemy <- pts_bbox %>%
   extract_gshhg(resolution = "i", epsg = 3571, buffer = 5000, simplify = FALSE, warn = FALSE) %>%
   st_transform(crs = prj.StudyArea)
-#
+
 land_ptolemy %>% ggplot() + geom_sf()
 
 st_simplify(land_ptolemy, preserveTopology = TRUE, dTolerance = 100)
-#
+
 
 # Draw logo
 logoFile <- file.path(baseDir, 'large_USGS_vector_green.png') ## Set to empty string if no logo to plot
@@ -106,7 +101,6 @@ if(nchar(logoFile)>0 & pngPackageLoaded){ ## prepare the logo for printing
 }else{
   draw.logo<-F
 }
-
 
 ## Success flags  ###############################################################################################################
 gotNIC_MIZ = FALSE				## Flag for successful collection of NIC MIZ
@@ -139,53 +133,28 @@ file.remove(lf[lf!=file.path(LocalWork, "maps")])
 
 Today<-Sys.Date() ## Grab today's date
 
-##########-----------------------------------------------  I dont think we need this anymore since we did it above
-
-## Define projections
-# #  --> this is due to using sp, may need to tweak due to moving to sf, but will probably be okay. 
-# # prj.StudyArea <- CRS("+proj=aeqd +lat_0=70 +lon_0=-170 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0") 
-# # prj.StudyAreaPositive <- CRS("+proj=aeqd +lat_0=70 +lon_0=190") 
-# prj.StudyArea <- st_crs(3572)          #what are the lats and longs for this area?
-# prj.StudyAreaPositive <- st_crs("+proj=laea +lat_0=70 +lon_0=190") 
-# prj.geo <- st_crs('+proj=longlat +datum=WGS84')
-# 
-# ## Build study area polygon in projected coordinate system
-# pts<-expand.grid(xLimits, yLimits)
-# names(pts)<-c('x','y')
-# #coordinates(pts) <- ~x+y
-# st_coordinates(pts)
-# proj4string(pts) <- prj.geo
-# # pts.StudyArea<-spTransform(pts, prj.StudyArea)
-# pts.StudyArea<-st_transform(pts, prj.StudyArea)
-# # ClipStudyArea_p = rgeos::gConvexHull(pts.StudyArea)  ## create the study area polygon
-# ClipStudyArea_p = rgeos::st_convex_hull(pts.StudyArea)  ## create the study area polygon
-# 
-# ## For plotting pull in a land coverage
-# data(wrld_simpl)  # --> this will switch over to smarter version of coastline
-# landAll<-wrld_simpl[wrld_simpl@data$ISO2 %in% c('RU', 'US', 'CA'),] ## Finer scale land coverage
-# #landAll.StudyArea<-spTransform(landAll, prj.StudyArea)
-# landAll.StudyArea<-st_transform(landAll, prj.StudyArea)
-# land.lines<-as(land, 'SpatialLines')
-##########-----------------------------------------------
-
 # Bathymetry (depth of water)  !!! switch from raster to terra
 BathymetryDataFile<-file.path(baseDir, 'rCode/ETOPO1.rData') 
 if(!file.exists(BathymetryDataFile)){
   require(marmap)
   require(terra)
-  
-  library(marmap)
-  #library(tidyverse) # for ggplot2
   library(sf) # To manipulate geographic (vector) data
   library(stars) # To manipulate geographic (raster) data
-  # Doawnlaod bathy data. Warning: the downloaded area should be centered on the # antimeridian. Otherwise, the left and right sides of the grid won't have the # same  resolution. The difference is minor, but it is enough for st_as_stars()# to complain
-  bath <- getNOAA.bathy(-120, 120, 47, 85, res = 1, antimeridian = TRUE, keep = TRUE)# Subset the bathy to get the desired area
+  # Doawnlaod bathy data. Warning: the downloaded area should be centered on the 
+  # antimeridian. Otherwise, the left and right sides of the grid won't have the 
+  # same  resolution. The difference is minor, but it is enough for st_as_stars()
+  # to complain
+  
+  bath <- getNOAA.bathy(-120, 120, 47, 85, res = 10, antimeridian = TRUE, keep = TRUE)# Subset the bathy to get the desired area
   bath_ok <- subsetBathy(bath, x = c(160, 240), y = c(47, 85), locator = FALSE)# Transform to stars object and set crs
   bath_stars <- st_as_stars(as.xyz(bath_ok))
   st_crs(bath_stars) <- "EPSG:4326"
-  # Extarct isobath (vecto) lines form the stars (raster) object
+  
+  # Extract isobath (vecto) lines form the stars (raster) object
   cont <- st_contour(bath_stars, contour_lines = TRUE, 
-                     breaks = c(seq(-6000, -1000, 500), -200, 0))# Define projection and plot with ggplot2 and sf
+                     breaks = c(seq(-6000, -1000, 500), -200, 0))
+  
+  # Define projection and plot with ggplot2 and sf
   proj <- "+proj=laea +lat_0=70 +lon_0=190"
   pl <- ggplot() +
     geom_sf(data = cont, alpha = 0.2) +
@@ -205,10 +174,11 @@ Yesterday<-Today-1  ## NIC MIZ is now one day behind.  Use yesterday's date.
 DestFile.zip<-file.path(LocalTemp, format(Today, 'nic_miz%Y%jnc_pl_a.zip'))
 DestFile.loc <- file.path(GISPantryLocation, format(Today, 'NIC_MIZ/%Y'))
 DestFile <- file.path(DestFile.loc, format(Today, 'nic_miz%Y%jnc_pl_a.shp'))
+
 if(!file.exists(DestFile) | file.info(DestFile)$size < 1000){  ## if the NIC MIZ is missing or unusually small, download it again
   base = 'https://www.natice.noaa.gov/pub/daily/arctic/'
   cat('\n-----------> Attempting to download', format(Yesterday, '%Y %B %d'), fill=T)
-  URL <-  "https://usicecenter.gov/File/Download?fName=daily_miz_n.zip"  # Why isnt the date in the name of this URL?
+  URL <-  "https://usicecenter.gov/File/Download?fName=daily_miz_n.zip" 
   MoveOn=FALSE  ## flag to move on from trying the NICMIZ
   n <-1 ## set counter
   n.try <- NIC_MIZ.attempts ## set number of attempts
@@ -254,39 +224,28 @@ if(file.exists(DestFile) & file.info(DestFile)$size > 1000){  	## test for it's 
   gotNIC_MIZ <- TRUE 													## Flag the success of acquiring the MIZ data
   cat('... reading in the', format(Today, 'nic_miz%Y%jnc_pl_a'), 'shape file using rgdal::st_read', fill = T)
   
-  MIZ_d <- st_read(dsn=DestFile.loc, layer=format(Today, 'nic_miz%Y%jnc_pl_a')) %>% dplyr::select(ICECODE) %>% st_make_valid()
-  if (is.null(st_crs(MIZ_d))) MIZ_d %>% st_crs(prj.geo)     		## Assign the coordinate system to geographic, if it is not already assigned
+  MIZ_d <- st_read(dsn=DestFile.loc, layer=format(Today, 'nic_miz%Y%jnc_pl_a')) %>% 
+    st_make_valid() %>% 
+    st_transform(prj.StudyArea)
   MIZ_d %>% st_is_valid()
-  MIZ_p.lines <- MIZ_d %>% filter(ICECODE=='CT81') %>% dplyr::select(2) %>% (st_cast("LINESTRING")) %>% st_transform(prj.StudyArea)
-  MIZ_m.lines <- MIZ_d %>% filter(ICECODE=='CT18') %>% dplyr::select(2) %>% (st_cast("LINESTRING")) %>% st_transform(prj.StudyArea)
-
-  #st_simplify(land_ptolemy, preserveTopology = TRUE, dTolerance = 100)
-  #sf_use_s2(land_ptolemy)
   
+  MIZ_p.lines <- MIZ_d %>% 
+    filter(ICECODE=='CT81') %>% st_cast("LINESTRING")
+  MIZ_m.lines <- MIZ_d %>% 
+    filter(ICECODE=='CT18') %>% st_cast("LINESTRING")
+
   landAll.buffer<-st_buffer(land_ptolemy, 4000)
   
-  library(parallel)
-  MIZ_p.l.clip <- parallel::mclapply(st_difference(MIZ_p.lines, landAll.buffer, byid=TRUE), mc.cores = detectCores())
-  parallel::mclapply(2/ntasks*runif(ntasks), sleepy, mc.cores = mc.cores)
-  
+  # NOT WORKING - memory issue
   MIZ_p.l.clip <- st_difference(MIZ_p.lines, landAll.buffer, byid=TRUE) ## Clip with land buffer
   MIZ_m.l.clip <- st_difference(st_difference(MIZ_m.lines, landAll.buffer, byid=TRUE), MIZ_p.l.clip)  ## Clip with land buffer
   
+  
   ## Clip the antimeridian
-  library(sp)
-  geo180.sp<-data.frame(id=rep(180, 200), x=rep(180, 200), 
-                        y=seq(from=40, to=89, length.out=200))
-  coordinates(geo180.sp) <- ~x+y
-  proj4string(geo180.sp) <- prj.geo
-  
-  library(sf)
-  
   geo180.sp1<-data.frame(id=rep(180, 200), x=rep(180, 200), 
                          y=seq(from=40, to=89, length.out=200))
-  sf::st_coordinates(geo180.sp1) <- ~x+y # or st_as_sf(x, coords = c("x","y"))
   geo180.sp1 <- st_as_sf(geo180.sp1, coords = c("x","y")) 
-  #proj4string(geo180.sp) <- prj.geo
-  st_crs(geo180.sp1)
+  st_crs(geo180.sp1) <- prj.geo
   
   geo180.spl<- SpatialLines(lapply(split(geo180.sp, geo180.sp$id), function(x) Lines(list(Line(coordinates(geo180.sp))), geo180.sp$id[1L])), prj.geo)  # need input
   #Buff180<-rgeos::gBuffer(spTransform(geo180.spl, prj.StudyArea), width=4000)   # --> Buff180 is that box that sits on the anitmeridian
@@ -383,7 +342,7 @@ if(!file.exists(geoTiffFile) | file.info(geoTiffFile)$size < 100000){  ## if the
   cat('--- >', geoTiffFile, 'has already been downloaded.  Moving on.', fill=T)
 }
 
-# SWITCH FROM RASTER TO TERRA
+# WORKING
 if(file.exists(geoTiffFile) & file.info(geoTiffFile)$size > 90000){  ## Check if file exists and is of an appropriate size
   gotAMSR <- TRUE					## Flag for existence of the AMSR data
   AMSR2gTif <- rast(geoTiffFile)
